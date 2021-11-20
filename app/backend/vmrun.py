@@ -1,6 +1,23 @@
 from subprocess import Popen, PIPE, STDOUT
 import json,os,backend.config,time
 
+def get_registered_vms() -> list:
+    with open(backend.config.config['registered_vm_config_path'],'r+') as file:
+        j = json.loads(file.read())
+        return j['vmx_path']
+
+def get_registered_vm_names() -> list:
+    with open(backend.config.config['registered_vm_config_path'],'r+') as file:
+        j = json.loads(file.read())
+        print(j['vmx_path'])
+        return [get_vm_name(i) for i in j['vmx_path']]
+
+def get_registered_vm_details() -> list:
+    with open(backend.config.config['registered_vm_config_path'],'r+') as file:
+        j = json.loads(file.read())
+        print(j['vmx_path'])
+        return [get_vm_detail(i) for i in j['vmx_path']]
+
 def get_running_vms() -> list:
     handle = Popen("vmrun -T ws list", shell=True, stdin=PIPE, stdout=PIPE)
     handle.wait()
@@ -9,18 +26,57 @@ def get_running_vms() -> list:
     l = l[1:]
     return l
 
+def get_vm_name(vmx_path:str) -> str:
+    return vmx_read(vmx_path)['displayName']
+
+def get_vm_detail(vmx_path:str) -> str:
+    running = get_running_vms()
+    readResult = vmx_read(vmx_path)
+    return {
+        'name': readResult['displayName'],
+        'running': running.count(vmx_path),
+        'vmxPath': vmx_path,
+        'efi': readResult.get('firmware') != None,
+        'guestOS': readResult['guestOS'],
+        'enable3d': readResult['mks.enable3d'],
+        'graphicsMemory': readResult['svga.graphicsMemoryKB'],
+        'macAddr': readResult['ethernet0.generatedAddress'],
+        'memSize': readResult['memsize'],
+        'core_count': readResult['numvcpus'],
+        'remoteDisplay': readResult.get('RemoteDisplay.vnc.enabled') != None and readResult.get('RemoteDisplay.vnc.enabled') == 'TRUE',
+        'remoteDisplayPort': readResult.get('RemoteDisplay.vnc.port')
+    }
+
 def start_vm(vmx_path:str, ) -> bool:
-    handle = Popen("vmrun -T ws start \"%s\"" % vmx_path, shell=True, stdin=PIPE, stdout=PIPE)
-    handle.wait()
+    handle = Popen("vmrun -T ws start \"%s\" nogui" % vmx_path, shell=True, stdin=PIPE, stdout=PIPE)
+    handle.wait(10)
     result = handle.stdout.read().decode('utf-8')
     if result.find('Error') == -1: return True
+    print(result)
     return False
 
 def stop_vm(vmx_path:str) -> bool:
-    handle = Popen("vmrun -T ws stop \"%s\"" % vmx_path, shell=True, stdin=PIPE, stdout=PIPE)
+    handle = Popen("vmrun -T ws stop \"%s\" hard" % vmx_path, shell=True, stdin=PIPE, stdout=PIPE)
     handle.wait()
     result = handle.stdout.read().decode('utf-8')
     if result == "": return True
+    print(result)
+    return False
+
+def reset_vm(vmx_path:str, ) -> bool:
+    handle = Popen("vmrun -T ws reset \"%s\" hard" % vmx_path, shell=True, stdin=PIPE, stdout=PIPE)
+    handle.wait()
+    result = handle.stdout.read().decode('utf-8')
+    if result.find('Error') == -1: return True
+    print(result)
+    return False
+
+def suspend_vm(vmx_path:str, ) -> bool:
+    handle = Popen("vmrun -T ws suspend \"%s\" hard" % vmx_path, shell=True, stdin=PIPE, stdout=PIPE)
+    handle.wait()
+    result = handle.stdout.read().decode('utf-8')
+    if result.find('Error') == -1: return True
+    print(result)
     return False
 
 def create_vdisk(size:str, adapter:str, vmdk_path:str) -> bool:
@@ -31,8 +87,9 @@ def create_vdisk(size:str, adapter:str, vmdk_path:str) -> bool:
     return False
 
 def vmx_read(vmx_path:str) -> dict:
+    print(vmx_path)
     result = {}
-    with open(vmx_path, 'r+') as file:
+    with open(vmx_path, 'r+', encoding='gbk') as file:
         for i in file.readlines():
             if i[0] == '#' or i == '\n': continue
             i = i[0:-1]

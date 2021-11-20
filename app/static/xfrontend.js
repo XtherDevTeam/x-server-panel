@@ -22,7 +22,7 @@ class x_object{
         for (const key in json) {
             if (Object.hasOwnProperty.call(json, key)) {
                 const element = json[key];
-                build += key + ": " + JSON.stringify(element);
+                build += key + ": " + element + ';';
             }
         }
         this.dom.setAttribute("style",build);
@@ -44,15 +44,22 @@ class x_object{
     }
 };
 
-function mount_dom(node_id) {
-    mount_point = node_id;
-    if (document.getElementById(node_id) == null) {
-        console.error("mount point not exist.");
-    }
-    return document.getElementById(node_id);
+function m(node_id){
+    return new x_object(node_id);
+}
+
+function fetch_json_api_nosync(url,method,callback){
+    if(method == undefined) method = 'get';
+    let xmlhttp = new XMLHttpRequest();
+    xmlhttp.open(method,url,1);
+    xmlhttp.onload = () => {
+        callback(JSON.parse(xmlhttp.responseText));
+    };
+    xmlhttp.send();
 }
 
 function fetch_json_api(url,method){
+    if(method == undefined) method = 'get';
     let xmlhttp = new XMLHttpRequest();
     xmlhttp.open(method,url,0);
     xmlhttp.send();
@@ -63,3 +70,12 @@ function fetch_json_api(url,method){
         return null;
     }
 }
+
+function arg(name) {
+    let reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i");
+    let r = window.location.search.substr(1).match(reg);
+    if (r != null) {
+        return decodeURIComponent(r[2]);
+    };
+    return null;
+ }

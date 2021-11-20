@@ -1,3 +1,4 @@
 *.pyc
 Windows 10 and later x64.vmxf
 Server.vmx
+app/static/images/*

@@ -1,0 +1,9 @@
+.x-container{
+    background-color: white;
+    width: 100%;
+    margin-right: auto;
+    margin-left: auto;
+    box-shadow: 1px 1px 5px gray;
+    display: block;
+    background: rgba(255,255,255,0.9);
+};
