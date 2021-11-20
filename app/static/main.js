@@ -4,7 +4,7 @@ function load_sidebar() {
     mainForm.insert('<div id="sidebar"></div>');
     let temp = new x_object("sidebar");
     temp.setCSS({
-        'side': ""
+        "float":"left"
     })
 }
 function load_all() {
