@@ -7,6 +7,12 @@ function load_sidebar() {
         "float":"left"
     })
 }
+
+function load_server_summary() {
+    let host_info = fetch_json_api('/api?r=host_info','get');
+    
+}
+
 function load_all() {
     
 }
