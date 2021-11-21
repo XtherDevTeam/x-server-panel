@@ -60,6 +60,18 @@ def get_running_vms() -> list:
 def get_vm_name(vmx_path:str) -> str:
     return vmx_read(vmx_path)['displayName']
 
+def get_cdrom_media(vmx:dict) -> tuple:
+    j = 0
+    i = 0
+    while vmx.get('sata' + str(i) + '.present') == 'TRUE':
+        while vmx.get('sata' + str(i) + ':' + str(j) + '.present') != None: 
+            print(vmx.get('sata' + str(i) + ':' + str(j) + '.deviceType'),i,j)
+            if vmx.get('sata' + str(i) + ':' + str(j) + '.deviceType') != None and vmx.get('sata' + str(i) + ':' + str(j) + '.deviceType').startswith('cdrom'):
+                return (i,j,vmx.get('sata' + str(i) + ':' + str(j) + '.fileName'))
+            j = j + 1
+        i = i + 1
+    return (114,514,"")
+
 def get_vm_detail(vmx_path:str) -> str:
     running = get_running_vms()
     readResult = vmx_read(vmx_path)
@@ -75,7 +87,9 @@ def get_vm_detail(vmx_path:str) -> str:
         'memSize': readResult['memsize'],
         'core_count': readResult['numvcpus'],
         'remoteDisplay': readResult.get('RemoteDisplay.vnc.enabled') != None and readResult.get('RemoteDisplay.vnc.enabled') == 'TRUE',
-        'remoteDisplayPort': readResult.get('RemoteDisplay.vnc.port')
+        'remoteDisplayPort': readResult.get('RemoteDisplay.vnc.port'),
+        'cdrom-media': get_cdrom_media(readResult)[2],
+        'cdrom-slot': [get_cdrom_media(readResult)[i] for i in range(2)]
     }
 
 def start_vm(vmx_path:str, ) -> bool:
@@ -126,8 +140,17 @@ def vmx_read(vmx_path:str) -> dict:
             i = i[0:-1]
             split_result = i.split(' = ')
             # print(split_result)
+            if result.get('.encoding') != None: break
             result[split_result[0]] = split_result[1][1:-1]
-        
+
+    with open(vmx_path, 'r+', encoding=result['.encoding']) as file:
+        for i in file.readlines():
+            if i[0] == '#' or i == '\n': continue
+            i = i[0:-1]
+            split_result = i.split(' = ')
+            # print(split_result)
+            result[split_result[0]] = split_result[1][1:-1]
+    
     return result
 
 def vmx_write(vmx_path:str, data:dict) -> bool:
@@ -182,14 +205,24 @@ def present_sata_harddisk(vmx:dict, vmdk:str, controller: int) -> dict:
 def present_sata_cdrom(vmx:dict, iso:str, controller:int) -> dict:
     j = get_free_sata_slot(vmx,controller)
     vmx['sata' + str(controller) + ':' + str(j) + '.present'] = "TRUE"
-    vmx['sata' + str(controller) + ':' + str(j) + '.deviceType'] = "cdrom-raw"
+    vmx['sata' + str(controller) + ':' + str(j) + '.deviceType'] = "cdrom-image"
     vmx['sata' + str(controller) + ':' + str(j) + '.fileName'] = iso
     return vmx
 
 def setup_sata_cdrom(vmx:dict, iso:str, controller:int, slot:int) -> dict:
-    if vmx.get('sata' + str(controller) + ':' + str(slot) + '.present') == "TRUE":
+    if vmx.get('sata' + str(controller) + ':' + str(slot) + '.present') != None:
+        vmx['sata' + str(controller) + ':' + str(slot) + '.present'] = "TRUE"
+        vmx['sata' + str(controller) + ':' + str(slot) + '.deviceType'] = "cdrom-image"
         vmx['sata' + str(controller) + ':' + str(slot) + '.fileName'] = iso
     return vmx
+
+def set_cdrom_media(vmx:str, iso:str) -> bool:
+    v = vmx_read(vmx)
+    # controller: int, slot: int
+    controller = get_cdrom_media(v)[0]
+    slot = get_cdrom_media(v)[1]
+    setup_sata_cdrom(v,iso,controller,slot)
+    return vmx_write(vmx,v)
 
 def remove_sata_slot(vmx:dict, controller: int, j: int) -> dict:
     j = str(j)

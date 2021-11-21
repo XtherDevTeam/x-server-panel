@@ -98,7 +98,7 @@ function vm_view_page_load_all() {
     m('main-panel').insert('<h2>' + vmx_detail['name'] + '</h2>');
     m('main-panel').insert(table_str);
 
-    m('main-panel').insert('<div id="xf-rightside"></div>');
+    m('main-panel').insert('<div id="xf-rightside" style="width: auto;float: left;"></div>');
     if(vmx_detail['remoteDisplay'] == true && vmx_detail['running'] == 1){
         m('xf-rightside').insert('<a href="vnc://' + window.location.hostname + ':' + vmx_detail['remoteDisplayPort'] + '" class="btn btn-primary">Open VNC Connection</a>');
     }else{
@@ -109,8 +109,30 @@ function vm_view_page_load_all() {
     m('xf-rightside').insert('<a href="javascript:;" class="btn btn-primary" onclick="vm_operation(' + arg('vmx') + ',\'stop\')" >Stop</a>&nbsp;');
     m('xf-rightside').insert('<a href="javascript:;" class="btn btn-primary" onclick="vm_operation(' + arg('vmx') + ',\'reset\')" >Reset</a>&nbsp;');
     m('xf-rightside').insert('<a href="javascript:;" class="btn btn-primary" onclick="vm_operation(' + arg('vmx') + ',\'suspend\')" >Suspend</a>&nbsp;');
+    m('xf-rightside').insert('<br><br>');
+
+    m('xf-rightside').insert('<div id="xf-cdrom-loader"></div>');
+    m('xf-cdrom-loader').makeDirectorySelector('CD-ROM Loaded media:','cdrom-media');
+    // console.log(m('xf-cdrom-loader').dom);
+    m('xf-rightside').insert('<br>');
+    m('xf-rightside').insert('<a href="javascript:;" class="btn btn-primary" onclick="load_cdrom_media(' + arg('vmx') + ')" >Load</a>&nbsp;');
+
+    document.getElementsByName('cdrom-media')[0].setAttribute("value",vmx_detail['cdrom-media'])
 
     m('main-panel').insert('<div style="clear:both;"></div>');
+}
+
+function load_cdrom_media(vmx_path) {
+    if(vmx_path[0] != '\'' || vmx_path[0] != '"') vmx_path = '\'' + vmx_path + '\'';
+    let media = d(document.getElementsByName('cdrom-media')[0]).getValue();
+    media = "'" + media + "'";
+    fetch_json_api_nosync('/api?r=vm&d=cdrom-change&media=' + media + '&p=' + vmx_path,'get',function (result) {
+        if(result['status'] == true){
+            window.location.reload();
+        }else{
+            alert('Change CD-ROM Media Failed.');
+        }
+    })
 }
 
 function submit_create_vm_request(){

@@ -46,6 +46,10 @@ def indexOfAPI():
             if d == 'remove': return {'status': backend.vmrun.remove_vm(p)}
             if d == 'unregister': return {'status': backend.vmrun.unregister_vm(p)}
             if d == 'register': return {'status': backend.vmrun.register_vm(p)}
+            if d == 'cdrom-change': 
+                media = flask.request.args.get('media')
+                if media[0] == '"' or media[0] == '\'': media = media[1:-1]
+                return {'status': backend.vmrun.set_cdrom_media(p,media)}
     elif r == 'path':
         d = flask.request.args.get('d')
         if d == None: return {'status':'fail', 'reason': 'path or action is null'}
