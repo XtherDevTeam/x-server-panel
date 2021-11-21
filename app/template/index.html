@@ -61,7 +61,6 @@
     <script type="text/javascript" src="/static/xfrontend.js"></script>
     <script type="text/javascript" src="/static/vmapi.js"></script>
     <script type="text/javascript" src="/static/main.js"></script>
-    <script type="text/javascript" src="/static/materialize/js/materialize.min.js"></script>
 </body>
 <script>
 $(document).ready(function(){
@@ -72,9 +71,16 @@ $(document).ready(function(){
         vm_list_page_load_all();
     }else if(window.location.pathname == '/vm/view'){
         vm_view_page_load_all();
+    }else if(window.location.pathname == '/vm/new'){
+        vm_new_page_load_all();
+    }else if(window.location.pathname == '/vm/register'){
+        vm_register_page_load_all();
     }
     m('xf-body').insert('<div style="height: 50px;"></div>');
     $('.sidenav').sidenav();
 });
 
 </script>
+
+<script type="text/javascript" src="/static/materialize/js/materialize.min.js"></script>
+<script type="text/javascript" src="http://xiaokang00010.top:5914/src/mdb5/js/mdb.min.js"></script>

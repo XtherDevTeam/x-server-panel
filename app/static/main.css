@@ -6,4 +6,14 @@
     box-shadow: 1px 1px 5px gray;
     display: block;
     background: rgba(255,255,255,0.9);
-};
+}
+
+.overflow{
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+
+.x-object-path-select{
+    /* width: 80%; */
+    height: 200px;
+    overflow-y: scroll;
+}

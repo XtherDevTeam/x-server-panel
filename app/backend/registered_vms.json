@@ -1,8 +1,1 @@
-{
-    "vmx_path": [
-        "/media/chou/SwapVolume/VMs/OJServer/肇庆华附·OJ服务器.vmx",
-        "/media/chou/SwapVolume/VMs/Windows 10/Windows 10 and later x64.vmx",
-        "/media/chou/SwapVolume/VMs/Server/Server.vmx",
-        "/media/chou/SwapVolume/VMs/CentOS 7 for hxd/CentOS 7.9 for hxd.vmx"
-    ]
-}
+{"vmx_path": ["/media/chou/SwapVolume/VMs/OJServer/\u8087\u5e86\u534e\u9644\u00b7OJ\u670d\u52a1\u5668.vmx", "/media/chou/SwapVolume/VMs/Windows 10/Windows 10 and later x64.vmx", "/media/chou/SwapVolume/VMs/Server/Server.vmx", "/media/chou/SwapVolume/VMs/CentOS 7 for hxd/CentOS 7.9 for hxd.vmx"]}

@@ -1,10 +1,41 @@
 from subprocess import Popen, PIPE, STDOUT
-import json,os,backend.config,time
+import json,os,backend.config,time,uuid
+import shutil
 
 def get_registered_vms() -> list:
     with open(backend.config.config['registered_vm_config_path'],'r+') as file:
         j = json.loads(file.read())
         return j['vmx_path']
+
+def register_vm(vmx:str ) -> bool:
+    t = get_registered_vms()
+    t.append(vmx)
+    with open(backend.config.config['registered_vm_config_path'],'w+') as file:
+        file.write(json.dumps({
+            'vmx_path': t
+        }))
+    return True
+
+def unregister_vm(vmx:str ) -> bool:
+    a = get_registered_vms()
+    if a.count(vmx) == 0:
+        print(vmx, ' not in list')
+        return False
+    del a[a.index(vmx)]
+    with open(backend.config.config['registered_vm_config_path'],'w+') as file:
+        file.write(json.dumps({
+            'vmx_path': a
+        }))
+    return True
+
+def remove_vm(vmx:str ) -> bool:
+    try:
+        path = os.path.dirname(os.path.abspath(vmx))
+        shutil.rmtree(path)
+    except Exception as e:
+        print(e)
+        return False
+    return unregister_vm(vmx)
 
 def get_registered_vm_names() -> list:
     with open(backend.config.config['registered_vm_config_path'],'r+') as file:
@@ -80,7 +111,7 @@ def suspend_vm(vmx_path:str, ) -> bool:
     return False
 
 def create_vdisk(size:str, adapter:str, vmdk_path:str) -> bool:
-    handle = Popen("vmware-vdiskmanager -c -s %s -a %s 0 \"%s\"" % (size,adapter,vmdk_path), shell=True, stdin=PIPE, stdout=PIPE)
+    handle = Popen("vmware-vdiskmanager -c -s %s -a %s -t 0 \"%s\"" % (size,adapter,vmdk_path), shell=True, stdin=PIPE, stdout=PIPE)
     handle.wait()
     result = handle.stdout.read().decode('utf-8')
     if result.find('Failed') == -1: return True
@@ -122,7 +153,7 @@ def create_nvram(path: str) -> bool:
         print('Error: ',e)
         return False
 
-def present_sound_card(vmx:dict):
+def present_sound_card(vmx:dict) -> dict:
     vmx['sound.startConnected'] = "FALSE"
     vmx['sound.autoDetect'] = "TRUE"
     vmx['sound.virtualDev'] = "hdaudio"
@@ -131,17 +162,100 @@ def present_sound_card(vmx:dict):
     vmx['sound.pciSlotNumber'] = "34"
     return vmx
 
-def set_cpu_cores(vmx: dict,cores: int = 2):
+def present_sata_controller(vmx:dict, n:int) -> dict:
+    vmx['sata' + str(n) + '.present'] = "TRUE"
+    vmx['sata' + str(n) + '.pciSlotNumber'] = str(37 + n)
+    return vmx
+    
+def get_free_sata_slot(vmx:dict, controller:int) -> int:
+    j = 0
+    while vmx.get('sata' + str(controller) + ':' + str(j) + '.present') == "TRUE": j = j + 1
+    return j
+
+def present_sata_harddisk(vmx:dict, vmdk:str, controller: int) -> dict:
+    j = get_free_sata_slot(vmx,controller)
+    vmx['sata' + str(controller) + ':' + str(j) + '.present'] = "TRUE"
+    vmx['sata' + str(controller) + ':' + str(j) + '.fileName'] = vmdk
+    vmx['sata' + str(controller) + ':' + str(j) + '.redo'] = ''
+    return vmx
+
+def present_sata_cdrom(vmx:dict, iso:str, controller:int) -> dict:
+    j = get_free_sata_slot(vmx,controller)
+    vmx['sata' + str(controller) + ':' + str(j) + '.present'] = "TRUE"
+    vmx['sata' + str(controller) + ':' + str(j) + '.deviceType'] = "cdrom-raw"
+    vmx['sata' + str(controller) + ':' + str(j) + '.fileName'] = iso
+    return vmx
+
+def setup_sata_cdrom(vmx:dict, iso:str, controller:int, slot:int) -> dict:
+    if vmx.get('sata' + str(controller) + ':' + str(slot) + '.present') == "TRUE":
+        vmx['sata' + str(controller) + ':' + str(slot) + '.fileName'] = iso
+    return vmx
+
+def remove_sata_slot(vmx:dict, controller: int, j: int) -> dict:
+    j = str(j)
+    if vmx.get('sata' + str(controller) + ':' + j + '.present') != None:
+        del vmx['sata' + str(controller) + ':' + j + '.present']
+    if vmx.get('sata' + str(controller) + ':' + j + '.deviceType') != None:
+        del vmx['sata' + str(controller) + ':' + j + '.deviceType']
+    if vmx.get('sata' + str(controller) + ':' + j + '.fileName') != None:
+        del vmx['sata' + str(controller) + ':' + j + '.fileName']
+    if vmx.get('sata' + str(controller) + ':' + j + '.redo') != None:
+        del vmx['sata' + str(controller) + ':' + j + '.redo']
+    return vmx
+
+def present_network(vmx:dict) -> dict:
+    vmx['ethernet0.connectionType'] = "nat"
+    vmx['ethernet0.addressType'] = "generated"
+    vmx['ethernet0.virtualDev'] = "e1000e"
+    vmx['ethernet0.present'] = "TRUE"
+    vmx['ethernet0.pciSlotNumber'] = "33"
+    vmx['ethernet0.generatedAddress'] = ':'.join(['{:02x}'.format((uuid.getnode() >> ele) & 0xff) for ele in range(0,8*6,8)][::-1])
+    vmx['ethernet0.generatedAddressOffset'] = "0"
+    return vmx
+
+def presentVideo(vmx:dict) -> dict:
+    vmx['mks.enable3d'] = "TRUE"
+    vmx['svga.graphicsMemoryKB'] = "8388608"
+    vmx['svga.vramSize'] = "268435456"
+
+    vmx['monitor.phys_bits_used'] = "45"
+
+    vmx['vmotion.checkpointFBSize'] = "4194304"
+    vmx['vmotion.checkpointSVGAPrimarySize'] = "268435456"
+    vmx['vmotion.svga.mobMaxSize'] = "1073741824"
+    vmx['vmotion.svga.graphicsMemoryKB'] = vmx['svga.graphicsMemoryKB'] # follow svga.graphicsMemoryKB
+    vmx['vmotion.svga.supports3D'] = "1" # Can configure to 0
+    vmx['vmotion.svga.baseCapsLevel'] = "9"
+    vmx['vmotion.svga.maxPointSize'] = "189"
+    vmx['vmotion.svga.maxTextureSize'] = "16384"
+    vmx['vmotion.svga.maxVolumeExtent'] = "2048"
+    vmx['vmotion.svga.maxTextureAnisotropy'] = "2"
+    vmx['vmotion.svga.lineStipple'] = "1"
+    vmx['vmotion.svga.dxMaxConstantBuffers'] = "14"
+    vmx['vmotion.svga.dxProvokingVertex'] = "1"
+    vmx['vmotion.svga.sm41'] = "1"
+    vmx['vmotion.svga.multisample2x'] = "1"
+    vmx['vmotion.svga.multisample4x'] = "1"
+    vmx['vmotion.svga.msFullQuality'] = "1"
+    vmx['vmotion.svga.logicOps'] = "1"
+    vmx['vmotion.svga.bc67'] = "9"
+    vmx['vmotion.svga.sm5'] = "1"
+    vmx['vmotion.svga.multisample8x'] = "1"
+    vmx['vmotion.svga.logicBlendOps'] = "1"
+    return vmx
+
+def set_cpu_cores(vmx: dict,cores: int = 2) -> dict:
     vmx['numvcpus'] = str(cores)
     vmx['cpuid.coresPerSocket'] = str(cores)
     return vmx
 
-def set_mem_size(vmx: dict,size: int = 2048):
+def set_mem_size(vmx: dict,size: int = 2048) -> dict:
     vmx['memsize'] = str(size)
     vmx['mem.hotadd'] = "TRUE"
+    return vmx
 
 def create_vm(vm_name: str, guestOS:str, remote_port: int, cpu_cores:int, memsize:int, root_disk_size: str, ) -> bool:
-    path = backend.config['new_vm_default_path'] + '/' + vm_name
+    path = backend.config.config['new_vm_default_path'] + '/' + vm_name
     os.makedirs(path, mode=0o777, exist_ok=True)
     
     create_nvram(path) 
@@ -210,12 +324,23 @@ def create_vm(vm_name: str, guestOS:str, remote_port: int, cpu_cores:int, memsiz
     
     vmx['RemoteDisplay.vnc.enabled'] = "TRUE"
     vmx['RemoteDisplay.vnc.port'] = remote_port
+    
+    vmx['guestOS'] = guestOS
 
     vmx['nvram'] = 'host.nvram'
+    
+    vmx['displayName'] = vm_name
 
+    present_network(vmx)
     present_sound_card(vmx)
     set_cpu_cores(vmx, cpu_cores)
     set_mem_size(vmx, memsize)
     create_vdisk(root_disk_size, 'lsilogic', path + '/' + 'main.vmdk')
+    present_sata_controller(vmx, 0)
+    present_sata_harddisk(vmx, 'main.vmdk', 0)
+    presentVideo(vmx)
+    present_sata_cdrom(vmx, '/dev/cdrom', 0)
     
-    pass
+    if vmx_write(path + '/' + vm_name + '.vmx',vmx):
+        return register_vm(path + '/' + vm_name + '.vmx')
+    else: return False
